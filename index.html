@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="as">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#176b52">
+  <title>সহজ Invoice</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#f2f5f3;color:#17221d;font:16px system-ui,sans-serif}
+    main{max-width:850px;margin:auto;padding:18px}
+    h1{font-size:1.5rem;margin:6px 0}
+    .card{background:white;border:1px solid #dce5df;border-radius:14px;padding:16px;margin:14px 0}
+    h2{font-size:1.05rem;margin:0 0 12px}
+    label{display:block;font-size:.88rem;margin:10px 0 5px}
+    input,textarea,button{font:inherit}
+    input,textarea{width:100%;padding:10px;border:1px solid #cbd6cf;border-radius:8px;background:white}
+    textarea{min-height:68px;resize:vertical}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .item{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin:10px 0}
+    button{border:0;border-radius:8px;padding:10px 14px;background:#176b52;color:white;cursor:pointer}
+    button.secondary{background:#e7efea;color:#174c3b}
+    button.remove{background:#fff0ed;color:#a33b2b;padding:9px 12px}
+    .actions{display:flex;gap:9px;flex-wrap:wrap}
+    .total{text-align:right;font-size:1.2rem;font-weight:700;margin-top:12px}
+    #stampPreview{color:#176b52;font-weight:800;border:3px solid #176b52;border-radius:50%;padding:12px;display:inline-block;transform:rotate(-10deg);margin-top:12px}
+    .hint{font-size:.82rem;color:#5b6a61}
+    @media(max-width:560px){main{padding:10px}.grid{grid-template-columns:1fr}.item{grid-template-columns:1fr 1fr}.item .name{grid-column:1/-1}}
+    @media print{
+      body{background:white} main{max-width:none;padding:0}
+      .no-print,button{display:none!important}
+      .card{border:0;padding:8px;margin:4px 0}
+      input,textarea{border:0;padding:2px;appearance:none}
+      #stampPreview{display:inline-block}
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>সহজ Invoice</h1>
+    <div class="hint">তথ্য পূৰণ কৰক, তাৰ পিছত Print / Save PDF টিপক।</div>
+  </header>
+
+  <section class="card">
+    <h2>Storeৰ তথ্য</h2>
+    <label>Storeৰ নাম</label><input id="storeName" placeholder="দোকানৰ নাম">
+    <label>ঠিকনা</label><textarea id="storeAddress" placeholder="দোকানৰ ঠিকনা"></textarea>
+    <label>Phone number</label><input id="storePhone" type="tel" placeholder="ফোন নম্বৰ">
+  </section>
+
+  <section class="card">
+    <h2>Invoice</h2>
+    <div class="grid">
+      <div><label>Invoice number</label><input id="invoiceNo" placeholder="যেনে: INV-001"></div>
+      <div><label>তাৰিখ</label><input id="invoiceDate" type="date"></div>
+    </div>
+    <label>গ্ৰাহকৰ নাম (ঐচ্ছিক)</label><input id="customer" placeholder="গ্ৰাহকৰ নাম">
+  </section>
+
+  <section class="card">
+    <h2>Items</h2>
+    <div id="items"></div>
+    <button class="secondary no-print" id="addItem">+ Item যোগ কৰক</button>
+    <div class="total">মুঠ: <span id="total">₹0.00</span></div>
+  </section>
+
+  <section class="card">
+    <h2>Digital stamp</h2>
+    <label>Stampৰ লেখা</label><input id="stampText" value="PAID" placeholder="যেনে: PAID">
+    <div id="stampPreview">PAID</div>
+    <p class="hint">Stampৰ লেখা সলনি কৰিলে invoiceত নতুন লেখা দেখা যাব।</p>
+  </section>
+
+  <section class="card no-print">
+    <div class="actions">
+      <button id="printBtn">Print / Save PDF</button>
+      <button class="secondary" id="saveBtn">তথ্য Save কৰক</button>
+      <button class="secondary" id="clearBtn">নতুন Invoice</button>
+    </div>
+    <p class="hint">PDF কৰিবলৈ Print / Save PDF টিপি printer বিকল্পত “Save as PDF” বাছক।</p>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const storageKey = "sohoj-invoice-v1";
+
+function addItem(name="", qty=1, price="") {
+  const row = document.createElement("div");
+  row.className = "item";
+  row.innerHTML = `
+    <div class="name"><label>Item</label><input class="iname" placeholder="Itemৰ নাম"></div>
+    <div><label>Quantity</label><input class="qty" type="number" min="0" step="any" value="1"></div>
+    <div><label>দাম</label><input class="price" type="number" min="0" step="0.01" placeholder="0.00"></div>
+    <button class="remove no-print" type="button" aria-label="Item আঁতৰাওক">×</button>`;
+  row.querySelector(".iname").value = name;
+  row.querySelector(".qty").value = qty;
+  row.querySelector(".price").value = price;
+  row.querySelectorAll("input").forEach(el => el.addEventListener("input", updateTotal));
+  row.querySelector(".remove").onclick = () => { row.remove(); updateTotal(); };
+  $("items").appendChild(row);
+  updateTotal();
+}
+
+function updateTotal() {
+  let total = 0;
+  document.querySelectorAll(".item").forEach(row => {
+    total += (Number(row.querySelector(".qty").value) || 0) *
+             (Number(row.querySelector(".price").value) || 0);
+  });
+  $("total").textContent = "₹" + total.toFixed(2);
+}
+
+function save() {
+  const data = {
+    storeName: $("storeName").value,
+    storeAddress: $("storeAddress").value,
+    storePhone: $("storePhone").value,
+    invoiceNo: $("invoiceNo").value,
+    invoiceDate: $("invoiceDate").value,
+    customer: $("customer").value,
+    stampText: $("stampText").value,
+    items: [...document.querySelectorAll(".item")].map(r => ({
+      name:r.querySelector(".iname").value,
+      qty:r.querySelector(".qty").value,
+      price:r.querySelector(".price").value
+    }))
+  };
+  localStorage.setItem(storageKey, JSON.stringify(data));
+}
+
+function load() {
+  const data = JSON.parse(localStorage.getItem(storageKey) || "null");
+  $("invoiceDate").value = new Date().toISOString().slice(0,10);
+  if (!data) { addItem(); return; }
+  ["storeName","storeAddress","storePhone","invoiceNo","invoiceDate","customer","stampText"]
+    .forEach(k => { if (data[k] !== undefined) $(k).value = data[k]; });
+  (data.items?.length ? data.items : [{}]).forEach(i => addItem(i.name, i.qty || 1, i.price || ""));
+  updateStamp();
+}
+
+function updateStamp() {
+  $("stampPreview").textContent = $("stampText").value || "STAMP";
+}
+
+$("addItem").onclick = () => addItem();
+$("saveBtn").onclick = () => { save(); alert("তথ্য save কৰা হ’ল।"); };
+$("printBtn").onclick = () => { save(); window.print(); };
+$("stampText").addEventListener("input", updateStamp);
+$("clearBtn").onclick = () => {
+  if (!confirm("নতুন invoice আৰম্ভ কৰিবনে? Storeৰ তথ্য থাকিব, invoiceৰ item মচি যাব।")) return;
+  $("invoiceNo").value = "";
+  $("customer").value = "";
+  $("invoiceDate").value = new Date().toISOString().slice(0,10);
+  $("items").innerHTML = "";
+  addItem();
+};
+document.querySelectorAll("input,textarea").forEach(el => {
+  el.addEventListener("change", save);
+});
+load();
+
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
