@@ -1,0 +1,8 @@
+{
+  "name": "সহজ Invoice",
+  "short_name": "Invoice",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2f5f3",
+  "theme_color": "#176b52"
+}
